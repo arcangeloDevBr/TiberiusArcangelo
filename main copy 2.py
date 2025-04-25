@@ -1,10 +1,6 @@
 import speech_recognition as sr
 import pyttsx3
-from transformers import pipeline
-from googletrans import Translator
-
-# Inicializando o tradutor
-translator = Translator()
+from neuronios import salvar_preferencias, recuperar_preferencias
 
 # Função para iniciar a fala
 def falar(texto):
@@ -40,32 +36,27 @@ def escutar():
         print(f"Erro de requisição; {e}")
         return None
 
-# Função para responder com IA (DialoGPT)
-def responder_com_ia(pergunta):
-    # Traduz a pergunta de português para inglês
-    pergunta_em_ingles = translator.translate(pergunta, src='pt', dest='en').text
-    print(f"Pergunta em inglês: {pergunta_em_ingles}")
-    
-    # Usando o modelo DialoGPT-medium
-    modelo = pipeline("text-generation", model="microsoft/DialoGPT-medium")
+# Função para aprender e salvar as preferências
+def aprender_comando(comando):
+    if 'sair' not in comando.lower():
+        # Exemplo simples de como entender preferências
+        falar("Quem está falando?")
+        nome =  escutar ()
+        if nome:
+            nome = nome
 
-    # Verifica se a pergunta não está vazia
-    if not pergunta_em_ingles:
-        return "Desculpe, não entendi a sua pergunta."
-    
-    resposta_ingles = modelo(pergunta_em_ingles, max_length=100, num_return_sequences=1, truncation=True)
-    
-    # Traduz a resposta de volta para o português
-    resposta_em_portugues = translator.translate(resposta_ingles[0]['generated_text'], src='en', dest='pt').text
-    
-    # Verificar e imprimir a resposta gerada
-    print(f"Resposta gerada em inglês: {resposta_ingles}")
-    print(f"Resposta traduzida: {resposta_em_portugues}")
-    
-    if resposta_em_portugues:
-        return resposta_em_portugues
+        falar(f"O que você gosta, {nome}?")
+        preferencia = escutar()
+
+        if preferencia:
+            
+            preferencias = {comando : preferencia}
+            salvar_preferencias(nome, preferencias)
+            falar(f"Eu agora sei que você gosta de {preferencia}.")
+        else:
+            falar("Não entendi o que você gosta.")
     else:
-        return "Não consegui gerar uma resposta."
+        falar("Desculpe, não entendi seu comando.")
 
 # Função principal
 def main():
@@ -76,9 +67,12 @@ def main():
             if 'sair' in comando.lower():
                 falar("Até logo!")
                 break
+            elif 'aprender' in comando.lower():
+                aprender_comando(comando)  # Chama a função para aprender e salvar
+            elif 'aprenda' in comando.lower():
+                aprender_comando(comando)  # Chama a função para aprender e salvar
             else:
-                resposta = responder_com_ia(comando)
-                falar(f"Tiberius respondeu: {resposta}")
+                falar(f"Você disse: {comando}")
         else:
             falar("Desculpe, não entendi.")
 
