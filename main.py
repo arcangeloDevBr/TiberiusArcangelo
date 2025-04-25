@@ -1,36 +1,39 @@
 import speech_recognition as sr
 import pyttsx3
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from googletrans import Translator
+import torch
 
-# Inicializando o tradutor
+# Inicializa tradutor
 translator = Translator()
 
-# Função para iniciar a fala
+# Carrega modelo e tokenizer da IA
+tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
+model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
+
+# Histórico de conversa
+chat_history_ids = None
+
+# Função para falar usando voz em português
 def falar(texto):
     engine = pyttsx3.init()
-    
-    # Obtém todas as vozes disponíveis
     voices = engine.getProperty('voices')
-
-    # Escolher a voz em português
     for voice in voices:
-        if 'portuguese' in voice.languages:
+        if 'portuguese' in voice.languages or 'pt' in voice.id.lower():
             engine.setProperty('voice', voice.id)
             break
-
     engine.say(texto)
     engine.runAndWait()
 
-# Função para escutar a fala
+# Função para escutar o usuário
 def escutar():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Diga algo...")
-        r.adjust_for_ambient_noise(source)  # Ajusta para o ruído ambiente
-        audio = r.listen(source)  # Captura o áudio
+        r.adjust_for_ambient_noise(source)
+        audio = r.listen(source)
     try:
-        texto = r.recognize_google(audio, language="pt-BR")  # Reconhecimento de fala em português
+        texto = r.recognize_google(audio, language="pt-BR")
         print("Você disse: " + texto)
         return texto
     except sr.UnknownValueError:
@@ -40,40 +43,41 @@ def escutar():
         print(f"Erro de requisição; {e}")
         return None
 
-# Função para responder com IA (DialoGPT)
+# Função de resposta inteligente com contexto
 def responder_com_ia(pergunta):
-    # Traduz a pergunta de português para inglês
-    pergunta_em_ingles = translator.translate(pergunta, src='pt', dest='en').text
-    print(f"Pergunta em inglês: {pergunta_em_ingles}")
-    
-    # Usando o modelo DialoGPT-medium
-    modelo = pipeline("text-generation", model="microsoft/DialoGPT-medium")
+    global chat_history_ids
 
-    # Verifica se a pergunta não está vazia
-    if not pergunta_em_ingles:
-        return "Desculpe, não entendi a sua pergunta."
-    
-    resposta_ingles = modelo(pergunta_em_ingles, max_length=100, num_return_sequences=1, truncation=True)
-    
-    # Traduz a resposta de volta para o português
-    resposta_em_portugues = translator.translate(resposta_ingles[0]['generated_text'], src='en', dest='pt').text
-    
-    # Verificar e imprimir a resposta gerada
-    print(f"Resposta gerada em inglês: {resposta_ingles}")
-    print(f"Resposta traduzida: {resposta_em_portugues}")
-    
-    if resposta_em_portugues:
-        return resposta_em_portugues
-    else:
-        return "Não consegui gerar uma resposta."
+    # Traduz a pergunta para inglês
+    pergunta_en = translator.translate(pergunta, src='pt', dest='en').text
+    print(f"Pergunta em inglês: {pergunta_en}")
 
-# Função principal
+    # Tokeniza a pergunta
+    nova_entrada_ids = tokenizer.encode(pergunta_en + tokenizer.eos_token, return_tensors='pt')
+
+    # Concatena com histórico, se houver
+    bot_input_ids = torch.cat([chat_history_ids, nova_entrada_ids], dim=-1) if chat_history_ids is not None else nova_entrada_ids
+
+    # Gera resposta
+    chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
+
+    # Extrai a nova resposta
+    resposta_en = tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
+    print(f"Resposta gerada em inglês: {resposta_en}")
+
+    # Traduz para português
+    resposta_pt = translator.translate(resposta_en, src='en', dest='pt').text
+    print(f"Resposta traduzida: {resposta_pt}")
+
+    return resposta_pt
+
+# Função principal do Tiberius
 def main():
     falar("Olá, sou Tiberius. Como posso te ajudar?")
     while True:
         comando = escutar()
         if comando:
-            if 'sair' in comando.lower():
+            comando_limpo = comando.lower().strip().replace('.', '').replace('!', '').replace('?', '')
+            if 'sair' in comando_limpo:
                 falar("Até logo!")
                 break
             else:
