@@ -1,6 +1,7 @@
+# main.py
+
 import speech_recognition as sr
 import pyttsx3
-from neuronios import salvar_preferencias, recuperar_preferencias
 
 # Função para iniciar a fala
 def falar(texto):
@@ -36,28 +37,6 @@ def escutar():
         print(f"Erro de requisição; {e}")
         return None
 
-# Função para aprender e salvar as preferências
-def aprender_comando(comando):
-    if 'sair' not in comando.lower():
-        # Exemplo simples de como entender preferências
-        falar("Quem está falando?")
-        nome =  escutar ()
-        if nome:
-            nome = nome
-
-        falar(f"O que você gosta, {nome}?")
-        preferencia = escutar()
-
-        if preferencia:
-            
-            preferencias = {comando : preferencia}
-            salvar_preferencias(nome, preferencias)
-            falar(f"Eu agora sei que você gosta de {preferencia}.")
-        else:
-            falar("Não entendi o que você gosta.")
-    else:
-        falar("Desculpe, não entendi seu comando.")
-
 # Função principal
 def main():
     falar("Olá, sou Tiberius. Como posso te ajudar?")
@@ -67,10 +46,6 @@ def main():
             if 'sair' in comando.lower():
                 falar("Até logo!")
                 break
-            elif 'aprender' in comando.lower():
-                aprender_comando(comando)  # Chama a função para aprender e salvar
-            elif 'aprenda' in comando.lower():
-                aprender_comando(comando)  # Chama a função para aprender e salvar
             else:
                 falar(f"Você disse: {comando}")
         else:
