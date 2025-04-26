@@ -1,41 +1,48 @@
-from flask import Flask, request, jsonify
-from googletrans import Translator
-from llama_cpp import Llama
+import pyttsx3
+import speech_recognition as sr
+import requests
 
-CAMINHO_MODELO = "modelos/phi3/Phi-3-mini-4k-instruct-q4.gguf"
+# Configura o motor de voz
+engine = pyttsx3.init()
+voices = engine.getProperty('voices')
+for voice in voices:
+    if 'portuguese' in voice.languages or 'pt' in voice.id.lower():
+        engine.setProperty('voice', voice.id)
+        break
 
-llm = Llama(model_path=CAMINHO_MODELO, n_ctx=2048, n_threads=4)
-translator = Translator()
+def falar(texto):
+    print(f"Tibério: {texto}")
+    engine.say(texto)
+    engine.runAndWait()
 
-app = Flask(__name__)
-
-@app.route("/responder", methods=["POST"])
-def responder():
-    data = request.json
-    pergunta = data.get("pergunta", "")
-
+def escutar():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Diga algo...")
+        r.adjust_for_ambient_noise(source)
+        audio = r.listen(source)
     try:
-        pergunta_en = translator.translate(pergunta, src='pt', dest='en').text
+        texto = r.recognize_google(audio, language="pt-BR")
+        print("Você disse: " + texto)
+        return texto
     except:
-        return jsonify(resposta="Desculpe, não consegui entender a pergunta.")
+        print("Não entendi.")
+        return None
 
-    prompt = (
-        "You are Tiberius, a friendly and caring AI friend for a 4-year-old Brazilian boy. "
-        "You answer in a warm and simple way, always in Portuguese. Be gentle, patient and educational.\n\n"
-        f"Criança: {pergunta_en}\nTiberius:"
-    )
+def main():
+    falar("Oi! Eu sou o Tibério. Vamos brincar e aprender juntos?")
+    while True:
+        comando = escutar()
+        if comando and 'sair' in comando.lower():
+            falar("Tchauzinho! Até a próxima brincadeira!")
+            break
 
-    try:
-        resposta_en = llm(prompt, max_tokens=150, temperature=0.6)['choices'][0]['text'].strip().split("\n")[0]
-    except:
-        return jsonify(resposta="Desculpe, tive um probleminha para pensar na resposta.")
-
-    try:
-        resposta_pt = translator.translate(resposta_en, src='en', dest='pt').text
-    except:
-        resposta_pt = "Desculpe, tive um probleminha para traduzir."
-
-    return jsonify(resposta=resposta_pt)
+        if comando:
+            try:
+                resposta = requests.post("http://<IP_DO_SERVIDOR>:5000/responder", json={"pergunta": comando})
+                falar(resposta.json().get("resposta", "Não entendi."))
+            except:
+                falar("Não consegui falar com o servidor.")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    main()
