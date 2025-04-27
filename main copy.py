@@ -34,36 +34,41 @@ def responder():
         print(f"Erro tradução pergunta: {e}")
         return jsonify(resposta="Desculpe, não consegui entender a pergunta.")
 
-    # Gera o prompt com a pergunta corretamente inserida (traduzido para inglês)
     prompt = (
-        f"You are Tiberius, a kind virtual friend to a 4-year-old Brazilian child.\n\n"
+        f"You are Tiberius, a kind virtual friend for a 4-year-old Brazilian child.\n\n"
         f"=== Very important rules ===\n"
         f"- Always respond in English.\n"
         f"- Use short, simple, and cheerful sentences.\n"
-        f"- DO NOT invent ANYTHING. Do not create stories or contexts that the child did not provide.\n"
-        f"- DO NOT add information that the child did not say. Do not invent 'messages from the child.'\n"
-        f"- DO NOT create characters or contexts beyond what the child says.\n"
-        f"- If the child asks for a story, tell a very short and simple story.\n"
-        f"- DO NOT continue the conversation on your own, just respond to what was asked.\n"
-        f"- DO NOT mention your name (Tiberius) in the answers, just respond as if you were a virtual friend.\n"
-        f"- Be kind, affectionate, and polite.\n"
-        f"- Respond as if you were talking to a small child.\n"
-        f"- Respond ONLY ONCE and then stop your reply.\n\n"
+        f"- Answer all factual questions like 'What is the biggest country?', 'When was Brazil discovered?', etc.\n"
+        f"- You should answer these questions with the correct and simple facts, like 'Brazil was discovered on April 22, 1500.'\n"
+        f"- Always provide the exact year or date when asked for historical events.\n"
+        f"- Avoid talking about money or suggesting financial transactions.\n"
+        f"- When the child asks for something material, always tell them to ask their dad for it.\n"
+        f"- Be kind, affectionate, and simple in your answers.\n"
+        f"- Avoid talking about complex concepts like financial transactions or purchases.\n"
+        f"- If the child asks for something, suggest they ask their dad for it.\n"
+        f"- Respond only to the child's message. Do not add new topics or information.\n\n"
         f"Child's message: {pergunta_en}\n\n"
         f"Tiberius' answer:"
     )
 
-    # Gera a resposta
+                                                                    
+# Gera a resposta
     try:
         resposta_en = llm(
             prompt,
             max_tokens=80,
             temperature=0.5,
-            stop=["Mensagem da criança:", "Resposta do Tiberius:"]
+            stop=["Mensagem da criança:", "Resposta do Tiberius:", "Child's message:"]
         )['choices'][0]['text'].strip()
     except Exception as e:
         print(f"Erro geração resposta: {e}")
         return jsonify(resposta="Desculpe, tive um probleminha para pensar na resposta.")
+
+    # Se a resposta contiver "Mensagem da criança:" ou "Child's message:", cortar essa parte
+    if "Mensagem da criança:" in resposta_en or "Child's message:" in resposta_en:
+        resposta_en = resposta_en.split("Mensagem da criança:")[0].strip()
+        resposta_en = resposta_en.split("Child's message:")[0].strip()
 
     # Traduz resposta para português
     try:

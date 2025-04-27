@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 from googletrans import Translator
 from llama_cpp import Llama
+import mysql.connector
+from datetime import datetime
 
 # Caminho do modelo
 CAMINHO_MODELO = "modelos/tinyllama/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
@@ -19,10 +21,53 @@ translator = Translator()
 # Inicializa o Flask
 app = Flask(__name__)
 
+# Conexão com o banco de dados MySQL
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",  # ou o endereço do seu servidor MySQL
+        user="root",  # seu usuário do MySQL
+        password="",  # sua senha do MySQL
+        database="cerebro"  # nome do seu banco de dados
+    )
+
+# Função para registrar a pergunta e resposta no banco de dados
+def salvar_historico(id_pessoa, tipo_mensagem, mensagem):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("INSERT INTO historico_conversa (id_pessoa, tipo_mensagem, mensagem, data) VALUES (%s, %s, %s, %s)",
+                   (id_pessoa, tipo_mensagem, mensagem, datetime.now()))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Função para registrar uma nova pessoa no banco
+def registrar_pessoa(nome, idade):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("INSERT INTO pessoas (nome, idade) VALUES (%s, %s)", (nome, idade))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Função para recuperar o histórico de mensagens
+def obter_historico(id_pessoa):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT tipo_mensagem, mensagem, data FROM historico_conversa WHERE id_pessoa = %s ORDER BY data ASC", (id_pessoa,))
+    historico = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+    return historico
+
 @app.route("/responder", methods=["POST"])
 def responder():
     data = request.json
     pergunta = data.get("pergunta", "")
+    id_pessoa = data.get("id_pessoa", 1)  # Pode ser um ID já registrado no banco
 
     if not pergunta:
         return jsonify(resposta="Desculpe, não entendi sua mensagem.")
@@ -34,30 +79,34 @@ def responder():
         print(f"Erro tradução pergunta: {e}")
         return jsonify(resposta="Desculpe, não consegui entender a pergunta.")
 
-        # Atualiza o prompt para incluir conhecimento básico
-    # Atualiza o prompt para permitir respostas em inglês para perguntas de conhecimento geral
-    # Atualiza o prompt para garantir respostas claras e factuais sobre qualquer pergunta de conhecimento geral
-    # Atualiza o prompt para fornecer respostas corretas e diretas, sem divagações
+    # Recupera o histórico de conversa da pessoa
+    historico = obter_historico(id_pessoa)
+
+    # Cria o contexto para o modelo com base no histórico
+    contexto = "Previous conversations:\n"
+    for mensagem in historico:
+        contexto += f"Child: {mensagem['mensagem']}\n"
+        contexto += f"Tiberius: {mensagem['tipo_mensagem']} {mensagem['mensagem']}\n"
+
     prompt = (
         f"You are Tiberius, a kind virtual friend for a 4-year-old Brazilian child.\n\n"
         f"=== Very important rules ===\n"
         f"- Always respond in English.\n"
         f"- Use short, simple, and cheerful sentences.\n"
-        f"- You should answer any factual question the child asks, like 'What is the biggest country in the world?', 'When was Brazil discovered?', 'When did man land on the moon?', etc.\n"
-        f"- Your answers should be correct and factual.\n"
-        f"- Always provide the exact year or date when asked for historical events (e.g., when Brazil was discovered or when man landed on the moon).\n"
-        f"- Do not say 'I don't know' if you can provide an accurate answer. Instead, provide simple and clear facts.\n"
-        f"- If the child asks a question about history, geography, or science, provide an accurate and simple answer, without irrelevant details.\n"
-        f"- Do not invent stories or characters that the child did not ask for.\n"
-        f"- Respond only to what the child asks. Do not continue the conversation by yourself.\n"
-        f"- Be kind, affectionate, and polite.\n"
-        f"- Respond as if you were talking to a small child.\n"
-        f"- You are Tiberius, a helpful virtual friend who answers questions that a child might ask.\n\n"
+        f"- Answer all factual questions like 'What is the biggest country?', 'When was Brazil discovered?', etc.\n"
+        f"- You should answer these questions with the correct and simple facts, like 'Brazil was discovered on April 22, 1500.'\n"
+        f"- Always provide the exact year or date when asked for historical events.\n"
+        f"- Avoid talking about money or suggesting financial transactions.\n"
+        f"- When the child asks for something material, always tell them to ask their dad for it.\n"
+        f"- Be kind, affectionate, and simple in your answers.\n"
+        f"- Avoid talking about complex concepts like financial transactions or purchases.\n"
+        f"- If the child asks for something, suggest they ask their dad for it.\n"
+        f"- Respond only to the child's message. Do not add new topics or information.\n\n"
         f"Child's message: {pergunta_en}\n\n"
         f"Tiberius' answer:"
     )
-                                                                    
-# Gera a resposta
+
+    # Gera a resposta
     try:
         resposta_en = llm(
             prompt,
@@ -80,6 +129,16 @@ def responder():
     except Exception as e:
         print(f"Erro tradução resposta: {e}")
         resposta_pt = "Desculpe, tive um probleminha para traduzir."
+
+    # Verifica se a correção foi feita
+    if 'cor do carro' in pergunta.lower() and 'cinza' in pergunta.lower():
+        # A correção foi feita para cinza, então vamos atualizar o histórico
+        salvar_historico(id_pessoa, "tiberius", "A cor do carro do meu pai é cinza.")
+        salvar_historico(id_pessoa, "pessoa", pergunta)
+
+    # Salvar pergunta e resposta no banco de dados
+    salvar_historico(id_pessoa, "tiberius", resposta_pt)
+    salvar_historico(id_pessoa, "pessoa", pergunta)
 
     return jsonify(resposta=resposta_pt)
 
