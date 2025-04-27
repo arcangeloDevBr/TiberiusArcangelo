@@ -1,0 +1,62 @@
+body {
+    background: linear-gradient(135deg, #0a0f2c, #1f2a62);
+    color: #ffffff;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+
+.container {
+    max-width: 500px;
+    margin: auto;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 20px #00eaff;
+}
+
+.titulo {
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.rosto {
+    width: 200px;
+    height: auto;
+    margin-bottom: 20px;
+    border-radius: 20px;
+    box-shadow: 0 0 15px #00eaff;
+}
+
+.resposta {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: rgba(0, 255, 255, 0.1);
+    border-radius: 10px;
+    min-height: 60px;
+    font-size: 1.2em;
+}
+
+.input {
+    width: 80%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 10px;
+    border: none;
+    font-size: 1em;
+}
+
+.botao {
+    padding: 10px 20px;
+    font-size: 1em;
+    background-color: #00eaff;
+    color: #0a0f2c;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.botao:hover {
+    background-color: #00c3cc;
+}

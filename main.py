@@ -1,89 +1,78 @@
-import os
-import pyttsx3
-import speech_recognition as sr
+# servidor_tiberius.py
+from flask import Flask, request, jsonify
 from googletrans import Translator
 from llama_cpp import Llama
+import sqlite3
 
-# Configurações
-CAMINHO_MODELO = "modelos/phi3/Phi-3-mini-4k-instruct-q4.gguf"
+CAMINHO_MODELO = "modelos/tinyllama/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"  # modelo novo!
+DATABASE = 'memoria.db'
 
-# Inicializa o modelo
-llm = Llama(model_path=CAMINHO_MODELO, n_ctx=2048, n_threads=4)
+llm = Llama(
+    model_path=CAMINHO_MODELO,
+    n_ctx=2048,
+    n_threads=4,
+    n_batch=512,
+)
 
-# Inicializa o tradutor
 translator = Translator()
+app = Flask(__name__)
 
-# Inicializa o motor de voz fora das funções para não reiniciar toda hora
-engine = pyttsx3.init()
-voices = engine.getProperty('voices')
-for voice in voices:
-    if 'portuguese' in voice.languages or 'pt' in voice.id.lower():
-        engine.setProperty('voice', voice.id)
-        break
+def salvar_mensagem(quem, mensagem):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO mensagens (quem, mensagem) VALUES (?, ?)", (quem, mensagem))
+    conn.commit()
+    conn.close()
 
-# Função para falar
-def falar(texto):
-    print(f"Tibério: {texto}")
-    engine.say(texto)
-    engine.runAndWait()
+def pegar_historico(limit=6):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT quem, mensagem FROM mensagens ORDER BY id DESC LIMIT ?", (limit,))
+    dados = cursor.fetchall()
+    conn.close()
+    return dados[::-1]  # inverter para ordem correta
 
-# Função para escutar
-def escutar():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Diga algo...")
-        r.adjust_for_ambient_noise(source)
-        audio = r.listen(source)
-    try:
-        texto = r.recognize_google(audio, language="pt-BR")
-        print("Você disse: " + texto)
-        return texto
-    except sr.UnknownValueError:
-        print("Não entendi o que você disse.")
-        return None
-    except sr.RequestError as e:
-        print(f"Erro de requisição: {e}")
-        return None
+@app.route("/responder", methods=["POST"])
+def responder():
+    data = request.json
+    pergunta = data.get("pergunta", "")
 
-# Função para gerar resposta
-def responder(pergunta):
     try:
         pergunta_en = translator.translate(pergunta, src='pt', dest='en').text
-    except:
-        return "Desculpe, não consegui entender a pergunta."
+    except Exception as e:
+        print(f"Erro tradução pergunta: {e}")
+        return jsonify(resposta="Desculpe, não consegui entender a pergunta.")
+
+    salvar_mensagem("Criança", pergunta)
+
+    historico = pegar_historico()
+
+    contexto = "\n".join([f"{quem}: {msg}" for quem, msg in historico])
 
     prompt = (
-        "You are Tiberius, a friendly and caring AI friend for a 4-year-old Brazilian boy. "
-        "You answer in a warm and simple way, always in Portuguese. Be gentle, patient and educational.\n\n"
-        f"Criança: {pergunta_en}\nTiberius:"
+        "Você é Tiberius, um amigo virtual gentil para uma criança brasileira de 4 anos. "
+        "Responda em português simples, curto e carinhoso. "
+        "Use o histórico para entender a conversa. "
+        "Não continue a conversa depois da resposta.\n\n"
+        f"Histórico:\n{contexto}\n\n"
+        f"Mensagem da criança: {pergunta_en}\nResposta do Tiberius:"
     )
 
     try:
-        resposta_en = llm(prompt, max_tokens=150, temperature=0.6)['choices'][0]['text'].strip().split("\n")[0]
-    except:
-        return "Desculpe, tive um probleminha para pensar na resposta."
+        resposta_en = llm(prompt, max_tokens=60, temperature=0.4)['choices'][0]['text'].strip()
+    except Exception as e:
+        print(f"Erro geração resposta: {e}")
+        return jsonify(resposta="Desculpe, tive um probleminha para pensar na resposta.")
 
     try:
         resposta_pt = translator.translate(resposta_en, src='en', dest='pt').text
-    except:
+    except Exception as e:
+        print(f"Erro tradução resposta: {e}")
         resposta_pt = "Desculpe, tive um probleminha para traduzir."
 
-    return resposta_pt
+    salvar_mensagem("Tiberius", resposta_pt)
 
-# Loop principal
-def main():
-    falar("Oi! Eu sou o Tibério. Vamos brincar e aprender juntos?")
-    while True:
-        comando = escutar()
-        if comando:
-            if 'sair' in comando.lower():
-                falar("Tchauzinho! Até a próxima brincadeira!")
-                break
-            else:
-                resposta = responder(comando)
-                falar(resposta)
-        else:
-            falar("Desculpe, não entendi. Pode repetir?")
+    return jsonify(resposta=resposta_pt)
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=5000)
