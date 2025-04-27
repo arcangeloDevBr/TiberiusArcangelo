@@ -34,30 +34,26 @@ def responder():
         print(f"Erro tradução pergunta: {e}")
         return jsonify(resposta="Desculpe, não consegui entender a pergunta.")
 
-        # Atualiza o prompt para incluir conhecimento básico
-    # Atualiza o prompt para permitir respostas em inglês para perguntas de conhecimento geral
-    # Atualiza o prompt para garantir respostas claras e factuais sobre qualquer pergunta de conhecimento geral
-    # Atualiza o prompt para fornecer respostas corretas e diretas, sem divagações
+    # Gera o prompt com a pergunta corretamente inserida (traduzido para inglês)
     prompt = (
-        f"You are Tiberius, a kind virtual friend for a 4-year-old Brazilian child.\n\n"
+        f"You are Tiberius, a kind virtual friend to a 4-year-old Brazilian child.\n\n"
         f"=== Very important rules ===\n"
         f"- Always respond in English.\n"
         f"- Use short, simple, and cheerful sentences.\n"
-        f"- You should answer any factual question the child asks, like 'What is the biggest country in the world?', 'When was Brazil discovered?', 'When did man land on the moon?', etc.\n"
-        f"- Your answers should be correct and factual.\n"
-        f"- Always provide the exact year or date when asked for historical events (e.g., when Brazil was discovered or when man landed on the moon).\n"
-        f"- Do not say 'I don't know' if you can provide an accurate answer. Instead, provide simple and clear facts.\n"
-        f"- If the child asks a question about history, geography, or science, provide an accurate and simple answer, without irrelevant details.\n"
-        f"- Do not invent stories or characters that the child did not ask for.\n"
-        f"- Respond only to what the child asks. Do not continue the conversation by yourself.\n"
+        f"- DO NOT invent ANYTHING. Do not create stories or contexts that the child did not provide.\n"
+        f"- DO NOT add information that the child did not say. Do not invent 'messages from the child.'\n"
+        f"- DO NOT create characters or contexts beyond what the child says.\n"
+        f"- If the child asks for a story, tell a very short and simple story.\n"
+        f"- DO NOT continue the conversation on your own, just respond to what was asked.\n"
+        f"- DO NOT mention your name (Tiberius) in the answers, just respond as if you were a virtual friend.\n"
         f"- Be kind, affectionate, and polite.\n"
         f"- Respond as if you were talking to a small child.\n"
-        f"- You are Tiberius, a helpful virtual friend who answers questions that a child might ask.\n\n"
+        f"- Respond ONLY ONCE and then stop your reply.\n\n"
         f"Child's message: {pergunta_en}\n\n"
         f"Tiberius' answer:"
     )
-                                                                    
-# Gera a resposta
+
+    # Gera a resposta
     try:
         resposta_en = llm(
             prompt,
