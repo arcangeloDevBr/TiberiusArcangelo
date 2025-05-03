@@ -11,7 +11,7 @@ while True:
         break
 
     try:
-        resposta = requests.post(f"http://{servidor}/responder", json={"pergunta": pergunta}, timeout=20)
+        resposta = requests.post(f"http://{servidor}/responder", json={"pergunta": pergunta}, timeout=50)
         if resposta.status_code == 200:
             dados = resposta.json()
             print(f"Tiberius: {dados['resposta']}\n")

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiberius no Navegador</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            background-color: #f4f4f4;
+        }
+        #tiberius-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin-bottom: 20px;
+            background-image: url('/imagens/curioso.png'); /* Imagem padrão */
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        #chat-container {
+            width: 80%;
+            max-width: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        #chat-log {
+            margin-bottom: 10px;
+            overflow-y: auto;
+            max-height: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .user-message {
+            text-align: right;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .tiberius-message {
+            text-align: left;
+            margin-bottom: 5px;
+            color: #007bff;
+        }
+        #input-container {
+            display: flex;
+            width: 80%;
+            max-width: 600px;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+            outline: none;
+        }
+        #send-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            outline: none;
+        }
+        #send-button:hover {
+            background-color: #0056b3;
+        }
+        .error-message {
+            color: red;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div id="tiberius-image"></div>
+    <div id="chat-container">
+        <div id="chat-log"></div>
+        <div id="input-container">
+            <input type="text" id="message-input" placeholder="Digite sua mensagem...">
+            <button id="send-button">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const chatLog = document.getElementById('chat-log');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const tiberiusImage = document.getElementById('tiberius-image');
+        const serverUrl = 'http://192.168.127.11:5000/responder';
+
+        const imageMap = {
+            'feliz': './imagens/feliz.png',
+            'bravo': './imagens/bravo.png',
+            'triste': './imagens/triste.png',
+            'surpreso': './imagens/surpreso.png',
+            'apaixonado': './imagens/apaixonado.png',
+            'curioso': './imagens/curioso.png' // Imagem padrão
+        };
+
+        function updateTiberiusImage(responseText) {
+            let newImage = imageMap['curioso']; // Padrão
+            for (const key in imageMap) {
+                if (responseText.toLowerCase().includes(key)) {
+                    newImage = imageMap[key];
+                    break;
+                }
+            }
+            tiberiusImage.style.backgroundImage = `url('${newImage}')`;
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                appendMessage('Você', message, 'user-message');
+                messageInput.value = '';
+
+                fetch(serverUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pergunta: message })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const reply = data.resposta;
+                    appendMessage('Tibério', reply, 'tiberius-message');
+                    updateTiberiusImage(reply);
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar mensagem:', error);
+                    appendMessage('Erro', 'Não foi possível conectar ao Tibério.', 'error-message');
+                    updateTiberiusImage('triste'); // Tibério triste em caso de erro
+                });
+            }
+        }
+
+        function appendMessage(sender, text, className) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add(className);
+            messageDiv.textContent = `${sender}: ${text}`;
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight; // Mantém a rolagem no final
+        }
+    </script>
+</body>
+</html>
